@@ -1,28 +1,39 @@
-const db = require('./db');
-const _ = require('underscore');
-const { ValidationError, NotFoundError, InvalidOperationError } = require('./errors');
+const db = require("./db");
+const _ = require("underscore");
+const {
+    ValidationError,
+    NotFoundError,
+    InvalidOperationError,
+} = require("./errors");
 
 async function saveQuizAsync(quiz) {
-    quiz.name = (quiz.name || '').trim();
-    if (quiz.name == '') {
-        throw new ValidationError('Blank quiz name');
+    quiz.name = (quiz.name || "").trim();
+    if (quiz.name == "") {
+        throw new ValidationError("Blank quiz name");
     }
 
     const allQuizzes = await db.getAllQuizzes();
     const nameExists = allQuizzes
         .filter(q => q.id != quiz.id)
-        .some(q => q.name.toLowerCase() == quiz.name.toLowerCase().trim());    
+        .some(q => q.name.toLowerCase() == quiz.name.toLowerCase().trim());
     if (nameExists) {
-        throw new ValidationError('Duplicate quiz name');
+        throw new ValidationError("Duplicate quiz name");
     }
 
-    if (quiz.questions.some(q => (q.question || '').trim() == '')) {
-        throw new ValidationError('Blank question');
+    if (quiz.questions.some(q => (q.question || "").trim() == "")) {
+        throw new ValidationError("Blank question");
     }
 
     quiz.questions.forEach(q => {
-        if (['correctAnswer', 'wrongAnswer1', 'wrongAnswer2', 'wrongAnswer3'].some(e => (q[e] || '').trim() == '')) {
-            throw new ValidationError('Blank answer');
+        if (
+            [
+                "correctAnswer",
+                "wrongAnswer1",
+                "wrongAnswer2",
+                "wrongAnswer3",
+            ].some(e => (q[e] || "").trim() == "")
+        ) {
+            throw new ValidationError("Blank answer");
         }
     });
 
@@ -35,7 +46,7 @@ async function getAllQuizzesAsync() {
     const list = quizzes.map(quiz => {
         return {
             id: quiz.id,
-            name: quiz.name
+            name: quiz.name,
         };
     });
     return list;
@@ -44,7 +55,7 @@ async function getAllQuizzesAsync() {
 async function getQuizAsync(id) {
     const quiz = await db.getQuiz(id);
     if (quiz == undefined) {
-        throw new NotFoundError('Quiz not found');
+        throw new NotFoundError("Quiz not found");
     }
     return quiz;
 }
@@ -52,7 +63,7 @@ async function getQuizAsync(id) {
 async function deleteQuizAsync(id) {
     const quiz = await db.getQuiz(id);
     if (quiz == undefined) {
-        throw new NotFoundError('Quiz not found');
+        throw new NotFoundError("Quiz not found");
     }
     await db.deleteQuiz(id);
 }
@@ -67,13 +78,12 @@ function trueShuffle(list) {
 
     while (needToShuffle) {
         shuffled = _.shuffle(list);
-        for (let i = 0; i < list.length; i++)
-        {
+        for (let i = 0; i < list.length; i++) {
             if (shuffled[i] != list[i]) {
                 needToShuffle = false;
                 break;
             }
-        }    
+        }
     }
 
     return shuffled;
@@ -83,7 +93,7 @@ async function hostQuizAsync(id, getRandomRoomCode = getRandom4DigitCode) {
     const quiz = await db.getQuiz(id);
 
     if (quiz == undefined) {
-        throw new NotFoundError('Quiz not found');
+        throw new NotFoundError("Quiz not found");
     }
 
     const questions = [];
@@ -93,29 +103,29 @@ async function hostQuizAsync(id, getRandomRoomCode = getRandom4DigitCode) {
             { answer: q.correctAnswer, isCorrect: true },
             { answer: q.wrongAnswer1, isCorrect: false },
             { answer: q.wrongAnswer2, isCorrect: false },
-            { answer: q.wrongAnswer3, isCorrect: false }
+            { answer: q.wrongAnswer3, isCorrect: false },
         ];
         answers = trueShuffle(answers);
-        answers[0].letter = 'A';
-        answers[1].letter = 'B';
-        answers[2].letter = 'C';
-        answers[3].letter = 'D';
+        answers[0].letter = "A";
+        answers[1].letter = "B";
+        answers[2].letter = "C";
+        answers[3].letter = "D";
 
         const question = {
             question: q.question,
-            answers: answers
+            answers: answers,
         };
 
         questions.push(question);
     });
-    
+
     let haveUniqueCode = false;
     let roomCode = undefined;
 
     while (!haveUniqueCode) {
         roomCode = getRandomRoomCode();
         let room = await db.getInstance(roomCode);
-        haveUniqueCode = (room == undefined);
+        haveUniqueCode = room == undefined;
     }
 
     const instance = {
@@ -124,8 +134,8 @@ async function hostQuizAsync(id, getRandomRoomCode = getRandom4DigitCode) {
         questions: questions,
         players: [],
         winner: undefined,
-        status: 'awaiting-players',
-        questionNumber: undefined
+        status: "awaiting-players",
+        questionNumber: undefined,
     };
 
     await db.saveInstance(instance);
@@ -136,12 +146,16 @@ async function hostQuizAsync(id, getRandomRoomCode = getRandom4DigitCode) {
 async function getStateAsync(roomCode, playerName = undefined) {
     const instance = await db.getInstance(roomCode);
     if (instance == undefined) {
-        throw new NotFoundError('Room not found');
+        throw new NotFoundError("Room not found");
     }
 
-    const player = playerName ? instance.players.find(p => p.name.toLowerCase() == playerName.toLowerCase().trim()) : undefined;
+    const player = playerName
+        ? instance.players.find(
+              p => p.name.toLowerCase() == playerName.toLowerCase().trim()
+          )
+        : undefined;
     if (playerName && player == undefined) {
-        throw new NotFoundError('Player not found');
+        throw new NotFoundError("Player not found");
     }
 
     const state = {};
@@ -157,12 +171,12 @@ async function getStateAsync(roomCode, playerName = undefined) {
     }
 
     switch (instance.status) {
-        case 'awaiting-players': {
+        case "awaiting-players": {
             state.players = instance.players.map(p => p.name);
             state.count = instance.players.length;
             break;
         }
-        case 'showing-question': {
+        case "showing-question": {
             const question = instance.questions[instance.questionNumber - 1];
             state.questionNumber = instance.questionNumber;
             state.totalQuestions = instance.questions.length;
@@ -170,17 +184,19 @@ async function getStateAsync(roomCode, playerName = undefined) {
             state.answers = [];
             question.answers.forEach(a => {
                 const answer = { letter: a.letter, answer: a.answer };
-                if (player && (player.answer == a.letter)) {
+                if (player && player.answer == a.letter) {
                     answer.isSelected = true;
                 }
                 state.answers.push(answer);
             });
             if (!player) {
-                state.answerCount = instance.players.filter(p => p.answer).length;
+                state.answerCount = instance.players.filter(
+                    p => p.answer
+                ).length;
             }
             break;
         }
-        case 'showing-answer': {
+        case "showing-answer": {
             const question = instance.questions[instance.questionNumber - 1];
             state.questionNumber = instance.questionNumber;
             state.totalQuestions = instance.questions.length;
@@ -191,38 +207,42 @@ async function getStateAsync(roomCode, playerName = undefined) {
                 const answer = {
                     letter: a.letter,
                     answer: a.answer,
-                    isCorrect: (a.isCorrect == true), // Deal with undefined!
-                    count: a.count || 0
+                    isCorrect: a.isCorrect == true, // Deal with undefined!
+                    count: a.count || 0,
                 };
                 if (answer.isCorrect) {
                     correctLetter = answer.letter;
                 }
-                if (player && (player.answer == a.letter)) {
+                if (player && player.answer == a.letter) {
                     answer.isSelected = true;
-                }    
+                }
                 state.answers.push(answer);
             });
             if (!player) {
-                state.answerCount = instance.players.filter(p => p.answer).length;
+                state.answerCount = instance.players.filter(
+                    p => p.answer
+                ).length;
             }
             if (player) {
-                state.isCorrect = (player.answer == correctLetter);
+                state.isCorrect = player.answer == correctLetter;
             }
             break;
         }
-        case 'showing-scores': {
+        case "showing-scores": {
             state.questionNumber = instance.questionNumber;
             state.totalQuestions = instance.questions.length;
             state.players = instance.players;
             if (instance.questionNumber == instance.questions.length) {
                 state.isGameOver = true;
-                const winners = instance.players.filter(p => p.rank == 1).map(p => p.name);
-                state.winner = winners.join(' and ');
+                const winners = instance.players
+                    .filter(p => p.rank == 1)
+                    .map(p => p.name);
+                state.winner = winners.join(" and ");
             }
             break;
         }
         default: {
-            throw new Error('Unrecognised room status');
+            throw new Error("Unrecognised room status");
         }
     }
 
@@ -232,21 +252,25 @@ async function getStateAsync(roomCode, playerName = undefined) {
 async function joinQuizAsync(roomCode, playerName) {
     const instance = await db.getInstance(roomCode);
 
-    if (instance == undefined || instance.status != 'awaiting-players') {
-        throw new NotFoundError('Room not found');
+    if (instance == undefined || instance.status != "awaiting-players") {
+        throw new NotFoundError("Room not found");
     }
 
-    if (instance.status != 'awaiting-players') {
-        throw new InvalidOperationError('Room is not accepting new players');
+    if (instance.status != "awaiting-players") {
+        throw new InvalidOperationError("Room is not accepting new players");
     }
 
-    if (instance.players.some(p => p.name.toLowerCase() == playerName.trim().toLowerCase())) {
-        throw new ValidationError('Name already taken');
+    if (
+        instance.players.some(
+            p => p.name.toLowerCase() == playerName.trim().toLowerCase()
+        )
+    ) {
+        throw new ValidationError("Name already taken");
     }
 
     const player = {
         name: playerName.trim(),
-        score: 0
+        score: 0,
     };
 
     instance.players.push(player);
@@ -258,16 +282,18 @@ async function submitAnswerAsync(roomCode, playerName, answer) {
     const instance = await db.getInstance(roomCode);
 
     if (instance == undefined) {
-        throw new NotFoundError('Room not found');
+        throw new NotFoundError("Room not found");
     }
 
-    if (instance.status != 'showing-question') {
-        throw new InvalidOperationError('Quiz is not waiting for answer');
+    if (instance.status != "showing-question") {
+        throw new InvalidOperationError("Quiz is not waiting for answer");
     }
 
-    const player = instance.players.find(p => p.name.toLowerCase() == playerName.toLowerCase().trim());
+    const player = instance.players.find(
+        p => p.name.toLowerCase() == playerName.toLowerCase().trim()
+    );
     if (player == undefined) {
-        throw new NotFoundError('Player not found');
+        throw new NotFoundError("Player not found");
     }
 
     player.answer = answer;
@@ -276,8 +302,8 @@ async function submitAnswerAsync(roomCode, playerName, answer) {
 }
 
 function start(instance) {
-    if (instance.players.length == 0) {
-        throw new InvalidOperationError('Not enough players yet');
+    if (instance.players.length < 2) {
+        throw new InvalidOperationError("Not enough players yet");
     }
     instance.questionNumber = 1;
     instance.players.forEach(p => {
@@ -285,7 +311,7 @@ function start(instance) {
         p.rank = undefined;
         p.score = 0;
     });
-    instance.status = 'showing-question';
+    instance.status = "showing-question";
 }
 
 function awardPoints(players, correctAnswer) {
@@ -300,10 +326,10 @@ function rankPlayers(players) {
     players.sort((p1, p2) => p2.score - p1.score);
     let rank = 1;
     players.forEach((p, i) => {
-        if (i > 0 && p.score != players[i-1].score) {
+        if (i > 0 && p.score != players[i - 1].score) {
             rank = i + 1;
         }
-        p.rank = rank;                
+        p.rank = rank;
     });
 }
 
@@ -319,46 +345,46 @@ function showAnswers(instance) {
     countResponses(instance.players, question);
     awardPoints(instance.players, correctAnswer);
     rankPlayers(instance.players);
-    instance.status = 'showing-answer';
+    instance.status = "showing-answer";
 }
 
 function showScores(instance) {
     instance.isGameOver = instance.questionNumber == instance.questions.length;
-    instance.status = 'showing-scores';
+    instance.status = "showing-scores";
 }
 
 function nextQuestion(instance) {
     if (instance.questionNumber >= instance.questions.length) {
-        throw new InvalidOperationError('No more questions');
+        throw new InvalidOperationError("No more questions");
     }
 
     instance.questionNumber++;
-    instance.players.forEach(p => p.answer = undefined);
-    instance.status = 'showing-question';
+    instance.players.forEach(p => (p.answer = undefined));
+    instance.status = "showing-question";
 }
 
 async function nextStageAsync(roomCode) {
-    const instance = await db.getInstance(roomCode);    
+    const instance = await db.getInstance(roomCode);
 
     if (instance == undefined) {
-        throw new NotFoundError('Room not found');
+        throw new NotFoundError("Room not found");
     }
 
     let finished = false;
     switch (instance.status) {
-        case 'awaiting-players':
+        case "awaiting-players":
             start(instance);
             await db.saveInstance(instance);
             break;
-        case 'showing-question':
+        case "showing-question":
             showAnswers(instance);
             await db.saveInstance(instance);
             break;
-        case 'showing-answer':
+        case "showing-answer":
             showScores(instance);
             await db.saveInstance(instance);
             break;
-        case 'showing-scores':
+        case "showing-scores":
             if (instance.questionNumber < instance.questions.length) {
                 nextQuestion(instance);
                 await db.saveInstance(instance);
@@ -377,8 +403,8 @@ async function deleteRoomAsync(roomCode) {
 }
 
 async function init() {
-    await db.saveQuiz(require('../sample-quizzes/demo-quiz-1'));
-    await db.saveQuiz(require('../sample-quizzes/demo-quiz-2'));    
+    await db.saveQuiz(require("../sample-quizzes/demo-quiz-1"));
+    await db.saveQuiz(require("../sample-quizzes/demo-quiz-2"));
 }
 
 init();
@@ -393,5 +419,5 @@ module.exports = {
     nextStageAsync,
     submitAnswerAsync,
     getStateAsync,
-    deleteRoomAsync
+    deleteRoomAsync,
 };
